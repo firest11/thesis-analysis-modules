@@ -1,0 +1,50 @@
+# import itertools as it
+import functools as ft
+import types
+import numpy as np
+import scipy.linalg as scilin
+import scipy.optimize as opt
+import scipy.stats as sts
+
+from . import fitfuncs as ffunc
+from . import fit_scripts as fitter
+
+
+def sort_c2pt(popt):
+    cool = popt.reshape((int(popt.shape[0]/2), 2))
+    how = np.asarray(sorted(cool, key=lambda x: x[1]))
+    return how.flatten()
+
+
+def get_mean_cov(data):
+    mean = data.mean(0)
+    cov = np.array([np.outer(d-mean, (d-mean).conj()) for d in data])
+    cov = cov.mean(0)
+    return mean, cov
+
+
+def get_mean_var(data):
+    mean, cov = get_mean_cov(data)
+    return mean, cov.diagonal()
+
+
+def jk_blocks(data, nbins):
+    Ncfg, cut = data.shape[0], data.shape[0]/nbins
+    inds = np.arange(0, cut)
+    while inds[-1] < Ncfg:
+        blocks = np.delete(data, inds, axis=0)
+        inds += cut
+        yield blocks
+
+
+def jk_blocks_arr(data, nbins):
+    blocks_gen = jk_blocks(data, nbins)
+    blocks = np.array([block for block in blocks_gen])
+    return blocks
+
+
+def calc_jk_mean_cov(data, nbin):
+    mean, coeff, blocks = data.mean(0), (nbin-1.0)/nbin, jk_blocks(data, nbin)
+    dcov_blocks = np.array([
+        np.outer( dblk.mean(0) - mean, (dblk.mean(0) - mean).conj()) for dblk in blocks
+    ])
